@@ -20,6 +20,7 @@
     --accent: #736bf4;
     --accent-soft: rgba(115, 107, 244, 0.12);
     --line: rgba(115, 107, 244, 0.35);
+    --line-past: rgba(110, 107, 123, 0.3);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -30,6 +31,7 @@
       --accent: #9b92ff;
       --accent-soft: rgba(155, 146, 255, 0.16);
       --line: rgba(155, 146, 255, 0.4);
+      --line-past: rgba(160, 157, 176, 0.3);
     }
   }
   * { box-sizing: border-box; }
@@ -44,26 +46,54 @@
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--accent); }
   .brand img { width: 36px; height: 36px; border-radius: 9px; }
   .card { margin-top: 20px; background: var(--card); border-radius: 22px; padding: 22px; box-shadow: 0 6px 24px rgba(40, 30, 120, 0.08); }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .kind { display: inline-block; font-size: 12px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 999px; }
+  .day { font-size: 13px; font-weight: 700; color: var(--sub); }
   h1 { font-size: 24px; margin: 10px 0 2px; }
   .name { color: var(--sub); font-size: 14px; margin: 0; }
+
+  /* いまの状況（その日の経路を、時刻表の上で追う） */
+  .status { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); }
+  .status b { display: block; font-size: 17px; color: var(--accent); }
+  .status span { display: block; font-size: 13px; color: var(--sub); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .status small { display: block; font-size: 11px; color: var(--sub); margin-top: 8px; opacity: 0.8; }
+
   ol { list-style: none; margin: 18px 0 0; padding: 0; }
   li { display: grid; grid-template-columns: 52px 18px 1fr auto; align-items: center; column-gap: 12px; min-height: 48px; }
+  li.past { opacity: 0.6; }
   .time { font-weight: 700; font-variant-numeric: tabular-nums; }
   .rail { position: relative; align-self: stretch; display: flex; align-items: center; justify-content: center; }
-  .rail::before { content: ""; position: absolute; left: 8px; width: 2px; top: 0; bottom: 0; background: var(--line); }
-  li:first-child .rail::before { top: 50%; }
-  li:last-child .rail::before { bottom: 50%; }
-  li:only-child .rail::before { display: none; }
-  .dot { position: relative; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); background: var(--card); }
-  .bell { position: relative; font-size: 13px; line-height: 1; background: var(--card); }
-  .stop b { display: block; font-size: 15px; }
+  .rail .up, .rail .down { position: absolute; left: 8px; width: 2px; background: var(--line); }
+  .rail .up { top: 0; bottom: 50%; }
+  .rail .down { top: 50%; bottom: 0; }
+  .rail .up.past, .rail .down.past { background: var(--line-past); }
+  li:first-child .rail .up, li:last-child .rail .down { display: none; }
+  .dot, .bell { isolation: isolate; }
+  .halo { z-index: -1; }
+  .dot { position: relative; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--accent); background: var(--card); }
+  li.past .dot { border-color: var(--line-past); }
+  .dot.at { width: 14px; height: 14px; background: var(--accent); }
+  .bell { position: relative; font-size: 13px; line-height: 1; background: var(--card); padding: 2px 0; }
+  li.past .bell { filter: grayscale(1); }
+  .stop b { display: block; font-size: 15px; font-weight: 500; }
+  li.at .stop b { font-weight: 700; color: var(--accent); }
   .stop small { color: var(--sub); font-size: 12px; }
   .before { color: var(--accent); font-size: 12px; font-weight: 700; }
+  li.past .before { color: var(--sub); }
+
+  /* いまいるところ: ふくらみながら消える輪（アプリの経路の画面と同じ） */
+  .halo { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+          background: var(--accent); opacity: 0.45; animation: halo 1.2s ease-out infinite; }
+  @keyframes halo { from { transform: scale(0.8); opacity: 0.45; } to { transform: scale(2.2); opacity: 0; } }
+  .moving { position: absolute; left: 3px; bottom: -6px; width: 12px; height: 12px; border-radius: 50%;
+            background: var(--accent); border: 2px solid var(--card); z-index: 1; }
+  .moving .halo { z-index: -1; }
+
   .button { display: block; margin-top: 24px; text-align: center; text-decoration: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 17px; padding: 15px; border-radius: 999px; }
   .note { color: var(--sub); font-size: 13px; line-height: 1.7; margin-top: 16px; }
   .error { text-align: center; color: var(--sub); line-height: 1.8; }
   [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .halo { animation: none; opacity: 0.25; } }
 </style>
 </head>
 <body>
@@ -71,9 +101,14 @@
   <div class="brand"><img src="icon.png" alt="">TimeSnap</div>
 
   <section class="card" id="route" hidden>
-    <span class="kind" id="kind">経路</span>
+    <div class="tags"><span class="kind" id="kind">経路</span><span class="day" id="day" hidden></span></div>
     <h1 id="title"></h1>
     <p class="name" id="name" hidden></p>
+    <div class="status" id="status" hidden>
+      <b id="status-title"></b>
+      <span id="status-next"></span>
+      <small>時刻表どおりに進んだときの位置です</small>
+    </div>
     <ol id="points"></ol>
   </section>
 
@@ -83,7 +118,7 @@
 
   <a class="button" id="open" href="timesnap://import">TimeSnap で開く</a>
   <p class="note">
-    TimeSnap で開くと、このままアラームを作ったり、マイリストに入れたりできます（Pro）。<br>
+    TimeSnap で開くと、このままアラームを作れます。<br>
     LINE などアプリの中で開いたときは、上のボタンを押すか、メニューから「Safari で開く」を選んでください。<br>
     TimeSnap は、乗換案内や予定表のスクショから、iPhone のアラームをまとめて作れるアプリです。
   </p>
@@ -95,8 +130,80 @@
   // 別のリンクを同じタブで開くと # のあとだけが変わってページが読み直されないので、読み直して中身とボタンを新しくする
   window.addEventListener("hashchange", () => location.reload());
 
-  function show(route) {
-    const points = route.points || [];
+  const ARRIVED_WINDOW = 2 * 60 * 1000; // 着いてから「到着しました」と出す時間（アプリと同じ 2 分）
+  const MARKS = { arrival: " 着", departure: " 発", stopover: " 停車" };
+  const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  // その時刻の日時（日付つきのリンクだけ。見る人の時間帯で読む）
+  function pointDates(route) {
+    if (!route.date) return null;
+    const [y, m, d] = route.date.split("-").map(Number);
+    return route.points.map(p => {
+      const [hh, mm] = p.time.split(":").map(Number);
+      return new Date(y, m - 1, d + (p.dayOffset || 0), hh, mm);
+    });
+  }
+
+  function dayLabel(route) {
+    const [y, m, d] = route.date.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    return `${m}/${d}（${WEEKDAYS[date.getDay()]}）`;
+  }
+
+  function minutesText(ms) {
+    const minutes = Math.max(1, Math.ceil(ms / 60000));
+    return minutes >= 60 ? `${Math.floor(minutes / 60)}時間${minutes % 60 ? minutes % 60 + "分" : ""}` : `${minutes}分`;
+  }
+
+  function pointName(p) {
+    return p.station ? p.station + (MARKS[p.direction] || "") : (p.note || p.time);
+  }
+
+  // いまの状況（アプリの RouteStatus と同じ決め方）
+  function statusOf(route, dates, now) {
+    const points = route.points;
+    let current = -1;
+    dates.forEach((date, i) => { if (date <= now) current = i; });
+    const nextIndex = dates.findIndex(date => date > now);
+    const next = nextIndex === -1 ? null : nextIndex;
+    const isSchedule = points.every(p => !p.station && !p.direction);
+    const status = { title: "", current: current === -1 ? null : current, next, arrived: false };
+
+    if (isSchedule) {
+      if (status.current !== null && now - dates[status.current] <= ARRIVED_WINDOW) {
+        status.arrived = true;
+        status.title = `${pointName(points[status.current])}の時間です`;
+      } else if (next !== null) {
+        status.title = `${pointName(points[next])}の予定です`;
+      } else {
+        status.title = "予定の時刻はすべて過ぎました";
+      }
+      return status;
+    }
+    if (status.current === null) {
+      status.title = `${points[0].station || ""}から${points[0].time}に出発します`;
+      return status;
+    }
+    const point = points[status.current];
+    if (next === null) {
+      status.arrived = point.direction === "arrival";
+      status.title = status.arrived ? `${point.station || ""}に到着しました` : "経路の時刻はすべて過ぎました";
+      return status;
+    }
+    if (point.direction === "arrival" && now - dates[status.current] <= ARRIVED_WINDOW) {
+      status.arrived = true;
+      status.title = `${point.station || ""}に到着しました`;
+    } else if (points[next].direction === "departure") {
+      status.title = `${points[next].station || point.station || ""}で乗り換え`;
+    } else {
+      const destination = points.slice(next).find(p => p.direction === "arrival") || points[next];
+      status.title = `${destination.station || ""}に向かっています`;
+    }
+    return status;
+  }
+
+  function render(route) {
+    const points = route.points;
     const stations = points.map(p => p.station).filter(Boolean);
     const isSchedule = stations.length === 0;
     let title = route.name || "空白の予定";
@@ -104,7 +211,7 @@
       const first = stations[0], last = stations[stations.length - 1];
       title = first === last ? first : first + " → " + last;
     }
-    document.title = "TimeSnap｜" + title;
+    document.title = "TimeSnap｜" + (route.date ? dayLabel(route) + " " : "") + title;
     document.getElementById("kind").textContent = isSchedule ? "予定" : "経路";
     document.getElementById("title").textContent = title;
     if (route.name && route.name !== title) {
@@ -112,23 +219,73 @@
       name.textContent = route.name;
       name.hidden = false;
     }
+    if (route.date) {
+      const day = document.getElementById("day");
+      day.textContent = "📅 " + dayLabel(route);
+      day.hidden = false;
+    }
+
+    // 日付つきで、その日（前の日の 0 時から、最後の時刻の 1 時間後まで）なら、時刻表の上でいまどこかを出す
+    const dates = pointDates(route);
+    const now = new Date();
+    let status = null;
+    if (dates) {
+      const dayStart = new Date(dates[0].getFullYear(), dates[0].getMonth(), dates[0].getDate());
+      const end = new Date(dates[dates.length - 1].getTime() + 60 * 60 * 1000);
+      if (now >= dayStart && now <= end) status = statusOf(route, dates, now);
+    }
+    const box = document.getElementById("status");
+    box.hidden = !status;
+    if (status) {
+      document.getElementById("status-title").textContent = status.title;
+      document.getElementById("status-next").textContent = status.next !== null
+        ? `次: ${points[status.next].time} ${pointName(points[status.next])}（あと${minutesText(dates[status.next] - now)}）`
+        : "";
+    }
+
     const list = document.getElementById("points");
-    const marks = { arrival: " 着", departure: " 発", stopover: " 停車" };
-    for (const p of points) {
+    list.replaceChildren();
+    points.forEach((p, i) => {
+      const isAt = status && status.current === i && status.arrived;
+      const isPast = status ? dates[i] <= now && !isAt : false;
+      const movingAfter = status && status.current === i && !status.arrived && status.next === i + 1;
       const li = document.createElement("li");
+      if (isPast) li.classList.add("past");
+      if (isAt) li.classList.add("at");
+
       const time = document.createElement("span");
       time.className = "time";
       time.textContent = p.time;
+
       const rail = document.createElement("span");
       rail.className = "rail";
+      const up = document.createElement("i");
+      up.className = "up" + (status && dates[i] <= now ? " past" : "");
+      const down = document.createElement("i");
+      down.className = "down" + (status && i + 1 < points.length && dates[i + 1] <= now ? " past" : "");
       const mark = document.createElement("span");
-      mark.className = p.hasAlarm ? "bell" : "dot";
+      mark.className = p.hasAlarm ? "bell" : "dot" + (isAt ? " at" : "");
       if (p.hasAlarm) mark.textContent = "🔔";
-      rail.append(mark);
+      if (isAt) {
+        const halo = document.createElement("i");
+        halo.className = "halo";
+        mark.append(halo);
+      }
+      rail.append(up, down, mark);
+      // この時刻と次の時刻の間にいる: 行の境目（線の上）で点滅する点
+      if (movingAfter) {
+        const moving = document.createElement("i");
+        moving.className = "moving";
+        const halo = document.createElement("i");
+        halo.className = "halo";
+        moving.append(halo);
+        rail.append(moving);
+      }
+
       const stop = document.createElement("span");
       stop.className = "stop";
       const b = document.createElement("b");
-      b.textContent = p.station ? p.station + (marks[p.direction] || "") : (p.note || "予定");
+      b.textContent = p.station ? p.station + (MARKS[p.direction] || "") : (p.note || "予定");
       stop.append(b);
       if (p.direction === "departure" && p.lineName) {
         const small = document.createElement("small");
@@ -143,7 +300,7 @@
       }
       li.append(time, rail, stop, before);
       list.append(li);
-    }
+    });
     document.getElementById("route").hidden = false;
   }
 
@@ -158,7 +315,9 @@
   decode(payload)
     .then(route => {
       if (!route.points || !route.points.length) throw new Error("empty");
-      show(route);
+      render(route);
+      // 開いたままでも、時間に合わせていまの位置を進める
+      if (route.date) setInterval(() => render(route), 15000);
     })
     .catch(() => { document.getElementById("error").hidden = false; });
 </script>
