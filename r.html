@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TimeSnap｜共有された経路</title>
+<meta name="description" content="TimeSnap で共有された経路・予定です。TimeSnap で開くと、このままアラームを作れます。">
+<meta property="og:title" content="TimeSnap で共有された経路・予定">
+<meta property="og:description" content="TimeSnap で開くと、このままアラームを作れます。">
+<meta property="og:image" content="https://mochido-studio.github.io/icon.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+  :root {
+    --bg: #f5f3ff;
+    --card: #ffffff;
+    --text: #1c1b22;
+    --sub: #6e6b7b;
+    --accent: #736bf4;
+    --accent-soft: rgba(115, 107, 244, 0.12);
+    --line: rgba(115, 107, 244, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141320;
+      --card: #232233;
+      --text: #f2f1f7;
+      --sub: #a09db0;
+      --accent: #9b92ff;
+      --accent-soft: rgba(155, 146, 255, 0.16);
+      --line: rgba(155, 146, 255, 0.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 440px; margin: 0 auto; padding: 32px 16px 48px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--accent); }
+  .brand img { width: 36px; height: 36px; border-radius: 9px; }
+  .card { margin-top: 20px; background: var(--card); border-radius: 22px; padding: 22px; box-shadow: 0 6px 24px rgba(40, 30, 120, 0.08); }
+  .kind { display: inline-block; font-size: 12px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 999px; }
+  h1 { font-size: 24px; margin: 10px 0 2px; }
+  .name { color: var(--sub); font-size: 14px; margin: 0; }
+  ol { list-style: none; margin: 18px 0 0; padding: 0; }
+  li { display: grid; grid-template-columns: 52px 18px 1fr auto; align-items: center; column-gap: 12px; min-height: 48px; }
+  .time { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rail { position: relative; align-self: stretch; display: flex; align-items: center; justify-content: center; }
+  .rail::before { content: ""; position: absolute; left: 8px; width: 2px; top: 0; bottom: 0; background: var(--line); }
+  li:first-child .rail::before { top: 50%; }
+  li:last-child .rail::before { bottom: 50%; }
+  li:only-child .rail::before { display: none; }
+  .dot { position: relative; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); background: var(--card); }
+  .bell { position: relative; font-size: 13px; line-height: 1; background: var(--card); }
+  .stop b { display: block; font-size: 15px; }
+  .stop small { color: var(--sub); font-size: 12px; }
+  .before { color: var(--accent); font-size: 12px; font-weight: 700; }
+  .button { display: block; margin-top: 24px; text-align: center; text-decoration: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 17px; padding: 15px; border-radius: 999px; }
+  .note { color: var(--sub); font-size: 13px; line-height: 1.7; margin-top: 16px; }
+  .error { text-align: center; color: var(--sub); line-height: 1.8; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><img src="icon.png" alt="">TimeSnap</div>
+
+  <section class="card" id="route" hidden>
+    <span class="kind" id="kind">経路</span>
+    <h1 id="title"></h1>
+    <p class="name" id="name" hidden></p>
+    <ol id="points"></ol>
+  </section>
+
+  <section class="card error" id="error" hidden>
+    <p>リンクの中身を読み取れませんでした。<br>送ってくれた人に、もう一度共有してもらってください。</p>
+  </section>
+
+  <a class="button" id="open" href="timesnap://import">TimeSnap で開く</a>
+  <p class="note">
+    TimeSnap で開くと、このままアラームを作ったり、マイリストに入れたりできます（Pro）。<br>
+    LINE などアプリの中で開いたときは、上のボタンを押すか、メニューから「Safari で開く」を選んでください。<br>
+    TimeSnap は、乗換案内や予定表のスクショから、iPhone のアラームをまとめて作れるアプリです。
+  </p>
+</main>
+<script>
+  // リンクの # のあとに、経路・予定の中身（JSON を raw deflate で縮めて URL に使える base64 にしたもの）が入っている
+  const payload = location.hash.slice(1);
+  document.getElementById("open").href = "timesnap://import#" + payload;
+
+  function show(route) {
+    const points = route.points || [];
+    const stations = points.map(p => p.station).filter(Boolean);
+    const isSchedule = stations.length === 0;
+    let title = route.name || "空白の予定";
+    if (stations.length) {
+      const first = stations[0], last = stations[stations.length - 1];
+      title = first === last ? first : first + " → " + last;
+    }
+    document.title = "TimeSnap｜" + title;
+    document.getElementById("kind").textContent = isSchedule ? "予定" : "経路";
+    document.getElementById("title").textContent = title;
+    if (route.name && route.name !== title) {
+      const name = document.getElementById("name");
+      name.textContent = route.name;
+      name.hidden = false;
+    }
+    const list = document.getElementById("points");
+    const marks = { arrival: " 着", departure: " 発", stopover: " 停車" };
+    for (const p of points) {
+      const li = document.createElement("li");
+      const time = document.createElement("span");
+      time.className = "time";
+      time.textContent = p.time;
+      const rail = document.createElement("span");
+      rail.className = "rail";
+      const mark = document.createElement("span");
+      mark.className = p.hasAlarm ? "bell" : "dot";
+      if (p.hasAlarm) mark.textContent = "🔔";
+      rail.append(mark);
+      const stop = document.createElement("span");
+      stop.className = "stop";
+      const b = document.createElement("b");
+      b.textContent = p.station ? p.station + (marks[p.direction] || "") : (p.note || "予定");
+      stop.append(b);
+      if (p.direction === "departure" && p.lineName) {
+        const small = document.createElement("small");
+        small.textContent = p.lineName;
+        stop.append(small);
+      }
+      const before = document.createElement("span");
+      before.className = "before";
+      if (p.hasAlarm) {
+        const minutes = p.offsetMinutes ?? route.offsetMinutes ?? 0;
+        before.textContent = minutes > 0 ? minutes + "分前" : "ちょうど";
+      }
+      li.append(time, rail, stop, before);
+      list.append(li);
+    }
+    document.getElementById("route").hidden = false;
+  }
+
+  async function decode(text) {
+    let base64 = text.replace(/-/g, "+").replace(/_/g, "/");
+    base64 += "=".repeat((4 - base64.length % 4) % 4);
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return JSON.parse(await new Response(stream).text());
+  }
+
+  decode(payload)
+    .then(route => {
+      if (!route.points || !route.points.length) throw new Error("empty");
+      show(route);
+    })
+    .catch(() => { document.getElementById("error").hidden = false; });
+</script>
+</body>
+</html>
