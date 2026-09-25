@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["P7XW3VG5FG.com.mochido.TimeSnap"],
+        "components": [
+          { "/": "/r", "comment": "経路・予定のシェアのリンク" },
+          { "/": "/r/", "comment": "GitHub Pages が /r/ に直したとき" }
+        ]
+      }
+    ]
+  }
+}
