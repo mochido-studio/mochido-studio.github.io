@@ -92,6 +92,8 @@
   // リンクの # のあとに、経路・予定の中身（JSON を raw deflate で縮めて URL に使える base64 にしたもの）が入っている
   const payload = location.hash.slice(1);
   document.getElementById("open").href = "timesnap://import#" + payload;
+  // 別のリンクを同じタブで開くと # のあとだけが変わってページが読み直されないので、読み直して中身とボタンを新しくする
+  window.addEventListener("hashchange", () => location.reload());
 
   function show(route) {
     const points = route.points || [];
